@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Button, TextInput, View, StyleSheet, Text, ScrollView, TouchableOpacity } from 'react-native';
+import React, { useState, useRef, useEffect } from 'react';
+import { Button, TextInput, View, StyleSheet, Text, FlatList, TouchableOpacity, Modal, Animated } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 
 export default function App() {
@@ -8,6 +8,8 @@ export default function App() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [search, setSearch] = useState('');
   const [filteredProblems, setFilteredProblems] = useState([]);
+  const [modalVisible, setModalVisible] = useState(false);
+  const animatedValue = useRef(new Animated.Value(0)).current;
 
   const handleInput = (text) => {
     setInput(text);
@@ -15,9 +17,19 @@ export default function App() {
 
   const handleButton = () => {
     const trimmedInput = input.trim();
-    setProblems((currentProblems) => [trimmedInput, ...currentProblems]);
-    setFilteredProblems([trimmedInput, ...problems]); // Update filtered problems as well
-    setInput('');
+    if (trimmedInput) { // Check if the trimmed input is not empty
+      setProblems((currentProblems) => [trimmedInput, ...currentProblems]);
+      setFilteredProblems([trimmedInput, ...problems]); // Update filtered problems as well
+      setInput('');
+      setModalVisible(false);
+      Animated.timing(animatedValue, {
+        toValue: 1,
+        duration: 500,
+        useNativeDriver: true,
+      }).start(() => {
+        animatedValue.setValue(0);
+      });
+    }
   };
 
   const handleEnter = () => {
@@ -42,6 +54,14 @@ export default function App() {
     setFilteredProblems(filtered);
   };
 
+  useEffect(() => {
+    Animated.timing(animatedValue, {
+      toValue: 1,
+      duration: 500,
+      useNativeDriver: true,
+    }).start();
+  }, [problems]);
+
   return (
     <View style={styles.appContainer}>
       {/* Hamburger Menu Icon */}
@@ -53,14 +73,7 @@ export default function App() {
 
       {!menuOpen ? (
         <View style={styles.inputContainer}>
-          <TextInput
-            style={styles.textInput}
-            placeholder="Write all problems here"
-            value={input}
-            onChangeText={handleInput}
-            onSubmitEditing={handleEnter}
-          />
-          <Button title="Add problem" color="#007BFF" onPress={handleButton} />
+          <Button title="Add problem" color="#007BFF" onPress={() => setModalVisible(true)} />
         </View>
       ) : (
         <View style={styles.searchContainer}>
@@ -79,23 +92,46 @@ export default function App() {
       {/* Problems List */}
       <View style={styles.problemsContainer}>
         <Text style={styles.problemsTitle}>List of problems</Text>
-        <ScrollView>
-          {(search ? filteredProblems : problems).length === 0 ? (
+        <FlatList
+          data={search ? filteredProblems : problems}
+          keyExtractor={(item, index) => index.toString()}
+          renderItem={({ item, index }) => (
+            <Animated.View style={{ ...styles.problemItem, opacity: animatedValue }}>
+              <Text style={styles.problemText}>{item}</Text>
+              <TouchableOpacity onPress={() => handleDelete(index)}>
+                <Icon name="delete" size={20} color="#FF0000" />
+              </TouchableOpacity>
+            </Animated.View>
+          )}
+          ListEmptyComponent={() => (
             <View style={styles.emptyContainer}>
               <Text style={styles.emptyText}>ENTER PROBLEMS</Text>
             </View>
-          ) : (
-            (search ? filteredProblems : problems).map((problem, index) => (
-              <View key={index} style={styles.problemItem}>
-                <Text style={styles.problemText}>{problem}</Text>
-                <TouchableOpacity onPress={() => handleDelete(index)}>
-                  <Icon name="delete" size={20} color="#FF0000" />
-                </TouchableOpacity>
-              </View>
-            ))
           )}
-        </ScrollView>
+        />
       </View>
+
+      {/* Modal for adding problems */}
+      <Modal
+        transparent={true}
+        visible={modalVisible}
+        onRequestClose={() => setModalVisible(false)}
+      >
+        <View style={styles.modalContainer}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Add a Problem</Text>
+            <TextInput
+              style={styles.textInput}
+              placeholder="Write your problem here"
+              value={input}
+              onChangeText={handleInput}
+              onSubmitEditing={handleEnter}
+            />
+            <Button title="Add" color="#007BFF" onPress={handleButton} />
+            <Button title="Cancel" color="#FF0000" onPress={() => setModalVisible(false)} />
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -178,5 +214,23 @@ const styles = StyleSheet.create({
     width: '85%',
     padding: 10,
     backgroundColor: '#fff',
+  },
+  modalContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.5)',
+  },
+  modalContent: {
+    width: '80%',
+    padding: 20,
+    backgroundColor: '#fff',
+    borderRadius: 10,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginBottom: 10,
+    textAlign: 'center',
   },
 });
